@@ -1,0 +1,6 @@
+{
+  "name": "经纬水印相机",
+  "description": "专业经纬度现场水印拍照相机，支持经纬度、地址、时间、天气、海拔和备注水印实时叠加与自定义默认值设置。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
