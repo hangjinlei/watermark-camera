@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -55,30 +56,36 @@ fun WatermarkOverlay(
     val watermarkTextStyle = TextStyle(
         color = Color.White,
         fontSize = baseFontSize,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+        fontWeight = FontWeight.Normal,
         shadow = textShadow,
         lineHeight = (20f * scale).sp
     )
 
+    val watermarkLines = config.generateWatermarkLines(currentTime)
+
     Box(
         modifier = modifier.fillMaxSize()
     ) {
-        // Center Watermark: "现场拍照"
+        // Center Watermark: "现场拍照" (Realistic tilted security stamp)
         if (config.showCenterWatermark && config.centerWatermarkText.isNotBlank()) {
             Text(
                 text = config.centerWatermarkText,
                 style = TextStyle(
-                    color = Color.White.copy(alpha = 0.22f),
-                    fontSize = 42.sp,
-                    fontWeight = FontWeight.Black,
+                    color = Color.White.copy(alpha = 0.20f),
+                    fontSize = 38.sp,
+                    letterSpacing = 6.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                    fontWeight = FontWeight.Bold,
                     shadow = Shadow(
-                        color = Color.Black.copy(alpha = 0.25f),
+                        color = Color.Black.copy(alpha = 0.22f),
                         offset = Offset(2f, 2f),
-                        blurRadius = 6f
+                        blurRadius = 5f
                     )
                 ),
                 modifier = Modifier
                     .align(Alignment.Center)
+                    .rotate(-15f)
                     .testTag("center_watermark_text")
             )
         }
@@ -108,66 +115,40 @@ fun WatermarkOverlay(
                         text = "单击编辑水印，长按编辑备注",
                         color = Color.White,
                         fontSize = (11.5f * scale).sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
                         fontWeight = FontWeight.Normal
                     )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
             }
 
-            // Watermark text lines
-            Text(text = "经度: ${config.longitude}", style = watermarkTextStyle)
-            Spacer(modifier = Modifier.height(lineSpacing))
-
-            Text(text = "纬度: ${config.latitude}", style = watermarkTextStyle)
-            Spacer(modifier = Modifier.height(lineSpacing))
-
-            if (config.showCoordinateSystem && config.coordinateSystem.isNotBlank()) {
-                Text(text = "坐标系: ${config.coordinateSystem}", style = watermarkTextStyle)
-                Spacer(modifier = Modifier.height(lineSpacing))
-            }
-
-            Text(
-                text = "地址: ${config.address}",
-                style = watermarkTextStyle,
-                modifier = Modifier.widthIn(max = 320.dp)
-            )
-            Spacer(modifier = Modifier.height(lineSpacing))
-
-            Text(text = "时间: $currentTime", style = watermarkTextStyle)
-            Spacer(modifier = Modifier.height(lineSpacing))
-
-            if (config.showAltitude && config.altitude.isNotBlank()) {
-                Text(text = "海拔: ${config.altitude}", style = watermarkTextStyle)
-                Spacer(modifier = Modifier.height(lineSpacing))
-            }
-
-            if (config.showWeather && config.weather.isNotBlank()) {
-                Text(text = "天气: ${config.weather}", style = watermarkTextStyle)
-                Spacer(modifier = Modifier.height(lineSpacing))
-            }
-
-            if (config.showRemarks && config.remarks.isNotBlank()) {
-                Text(text = "备注: ${config.remarks}", style = watermarkTextStyle)
+            // Watermark text lines (automatically wrapped at 11 characters)
+            watermarkLines.forEachIndexed { index, line ->
+                Text(text = line, style = watermarkTextStyle)
+                if (index < watermarkLines.size - 1) {
+                    Spacer(modifier = Modifier.height(lineSpacing))
+                }
             }
         }
 
-        // Bottom Right Brand Watermark
+        // Bottom Right Brand Watermark (Realistic clean camera branding)
         if (config.showBrandWatermark && config.brandWatermarkText.isNotBlank()) {
             Text(
                 text = config.brandWatermarkText,
                 style = TextStyle(
-                    color = Color.White.copy(alpha = 0.55f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.65f),
+                    fontSize = 11.5.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                    fontWeight = FontWeight.Normal,
                     shadow = Shadow(
-                        color = Color.Black.copy(alpha = 0.6f),
+                        color = Color.Black.copy(alpha = 0.5f),
                         offset = Offset(1f, 1f),
-                        blurRadius = 3f
+                        blurRadius = 2.5f
                     )
                 ),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 22.dp)
+                    .padding(end = 18.dp, bottom = 24.dp)
                     .testTag("brand_watermark_text")
             )
         }

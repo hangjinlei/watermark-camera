@@ -101,6 +101,8 @@ import java.util.concurrent.Executors
  */
 @Composable
 fun CameraScreen(
+    config: WatermarkConfig,
+    onConfigChange: (WatermarkConfig) -> Unit,
     settingsManager: SettingsManager,
     onNavigateToSettings: () -> Unit,
     onNavigateToGallery: () -> Unit,
@@ -111,10 +113,7 @@ fun CameraScreen(
     val coroutineScope = rememberCoroutineScope()
     val locationHelper = remember { LocationHelper(context) }
 
-    // Active watermark configuration for current shooting session
-    var config by remember { mutableStateOf(settingsManager.getDefaultConfig()) }
-
-    // Live Clock State (updates every second)
+    // Live Clock State (updates every second when autoTime is enabled)
     var currentTimeStr by remember {
         mutableStateOf(
             SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
@@ -164,11 +163,13 @@ fun CameraScreen(
             coroutineScope.launch {
                 val loc = locationHelper.getCurrentLocation()
                 if (loc != null) {
-                    config = config.copy(
-                        longitude = String.format(Locale.US, "%.6f", loc.longitude),
-                        latitude = String.format(Locale.US, "%.6f", loc.latitude),
-                        altitude = String.format(Locale.US, "%.1f米", loc.altitude),
-                        address = if (config.autoAddress && !loc.address.isNullOrBlank()) loc.address else config.address
+                    onConfigChange(
+                        config.copy(
+                            longitude = String.format(Locale.US, "%.6f", loc.longitude),
+                            latitude = String.format(Locale.US, "%.6f", loc.latitude),
+                            altitude = String.format(Locale.US, "%.1f米", loc.altitude),
+                            address = if (config.autoAddress && !loc.address.isNullOrBlank()) loc.address else config.address
+                        )
                     )
                 }
             }
@@ -187,11 +188,13 @@ fun CameraScreen(
         } else if (config.autoGps) {
             val loc = locationHelper.getCurrentLocation()
             if (loc != null) {
-                config = config.copy(
-                    longitude = String.format(Locale.US, "%.6f", loc.longitude),
-                    latitude = String.format(Locale.US, "%.6f", loc.latitude),
-                    altitude = String.format(Locale.US, "%.1f米", loc.altitude),
-                    address = if (config.autoAddress && !loc.address.isNullOrBlank()) loc.address else config.address
+                onConfigChange(
+                    config.copy(
+                        longitude = String.format(Locale.US, "%.6f", loc.longitude),
+                        latitude = String.format(Locale.US, "%.6f", loc.latitude),
+                        altitude = String.format(Locale.US, "%.1f米", loc.altitude),
+                        address = if (config.autoAddress && !loc.address.isNullOrBlank()) loc.address else config.address
+                    )
                 )
             }
         }
@@ -206,7 +209,13 @@ fun CameraScreen(
             coroutineScope.launch {
                 val bitmap = WatermarkRenderer.loadBitmapFromUri(context, uri)
                 if (bitmap != null) {
-                    val watermarked = WatermarkRenderer.drawWatermark(bitmap, config, burnHintBadge = false)
+                    val watermarked = WatermarkRenderer.drawWatermark(
+                        bitmap,
+                        config.copy(
+                            time = if (config.autoTime) currentTimeStr else config.getEffectiveTime()
+                        ),
+                        burnHintBadge = false
+                    )
                     val savedFile = WatermarkRenderer.saveWatermarkedBitmap(context, watermarked)
                     if (savedFile != null) {
                         Toast.makeText(context, "水印添加成功！", Toast.LENGTH_SHORT).show()
@@ -399,11 +408,13 @@ fun CameraScreen(
                         coroutineScope.launch {
                             val loc = locationHelper.getCurrentLocation()
                             if (loc != null) {
-                                config = config.copy(
-                                    longitude = String.format(Locale.US, "%.6f", loc.longitude),
-                                    latitude = String.format(Locale.US, "%.6f", loc.latitude),
-                                    altitude = String.format(Locale.US, "%.1f米", loc.altitude),
-                                    address = if (!loc.address.isNullOrBlank()) loc.address else config.address
+                                onConfigChange(
+                                    config.copy(
+                                        longitude = String.format(Locale.US, "%.6f", loc.longitude),
+                                        latitude = String.format(Locale.US, "%.6f", loc.latitude),
+                                        altitude = String.format(Locale.US, "%.1f米", loc.altitude),
+                                        address = if (!loc.address.isNullOrBlank()) loc.address else config.address
+                                    )
                                 )
                                 Toast.makeText(context, "GPS与地址已更新", Toast.LENGTH_SHORT).show()
                             } else {
@@ -599,11 +610,13 @@ fun CameraScreen(
                     coroutineScope.launch {
                         val loc = locationHelper.getCurrentLocation()
                         if (loc != null) {
-                            config = config.copy(
-                                longitude = String.format(Locale.US, "%.6f", loc.longitude),
-                                latitude = String.format(Locale.US, "%.6f", loc.latitude),
-                                altitude = String.format(Locale.US, "%.1f米", loc.altitude),
-                                address = if (!loc.address.isNullOrBlank()) loc.address else config.address
+                            onConfigChange(
+                                config.copy(
+                                    longitude = String.format(Locale.US, "%.6f", loc.longitude),
+                                    latitude = String.format(Locale.US, "%.6f", loc.latitude),
+                                    altitude = String.format(Locale.US, "%.1f米", loc.altitude),
+                                    address = if (!loc.address.isNullOrBlank()) loc.address else config.address
+                                )
                             )
                             Toast.makeText(context, "已获取最新GPS坐标", Toast.LENGTH_SHORT).show()
                         } else {
@@ -612,7 +625,7 @@ fun CameraScreen(
                     }
                 },
                 onConfirm = { updatedConfig, saveAsDefault ->
-                    config = updatedConfig
+                    onConfigChange(updatedConfig)
                     if (saveAsDefault) {
                         settingsManager.saveDefaultConfig(updatedConfig)
                         Toast.makeText(context, "已同时保存为默认水印！", Toast.LENGTH_SHORT).show()
@@ -630,9 +643,10 @@ fun CameraScreen(
                 initialRemarks = config.remarks,
                 onDismiss = { showRemarksDialog = false },
                 onConfirm = { newRemarks, saveAsDefault ->
-                    config = config.copy(remarks = newRemarks)
+                    val updated = config.copy(remarks = newRemarks)
+                    onConfigChange(updated)
                     if (saveAsDefault) {
-                        settingsManager.saveDefaultConfig(config)
+                        settingsManager.saveDefaultConfig(updated)
                         Toast.makeText(context, "已设为默认备注！", Toast.LENGTH_SHORT).show()
                     }
                     showRemarksDialog = false

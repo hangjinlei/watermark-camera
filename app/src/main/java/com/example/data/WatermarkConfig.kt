@@ -34,14 +34,71 @@ data class WatermarkConfig(
 ) {
     /**
      * Returns the formatted time string to display.
+     * When autoTime is false and a custom time is set, returns the custom time.
      */
     fun getEffectiveTime(): String {
-        return if (autoTime || time.isBlank()) {
+        return if (!autoTime && time.isNotBlank()) {
+            time
+        } else {
             val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
             sdf.format(Date())
-        } else {
-            time
         }
+    }
+
+    /**
+     * Generates all watermark lines in order.
+     * If any field's content exceeds 11 characters (e.g. address or remarks),
+     * it is wrapped with at most 11 characters per line.
+     */
+    fun generateWatermarkLines(effectiveTime: String = getEffectiveTime()): List<String> {
+        val result = mutableListOf<String>()
+
+        fun addWrappedField(prefix: String, content: String, maxChars: Int = 11) {
+            val cleanContent = content.trim()
+            if (cleanContent.isEmpty()) return
+            if (cleanContent.length <= maxChars) {
+                result.add("$prefix: $cleanContent")
+            } else {
+                result.add("$prefix: ${cleanContent.substring(0, maxChars)}")
+                var remainder = cleanContent.substring(maxChars)
+                while (remainder.isNotEmpty()) {
+                    val takeLen = minOf(maxChars, remainder.length)
+                    result.add(remainder.substring(0, takeLen))
+                    remainder = remainder.substring(takeLen)
+                }
+            }
+        }
+
+        // 1. 经度
+        addWrappedField("经度", longitude)
+        // 2. 纬度
+        addWrappedField("纬度", latitude)
+        // 3. 坐标系
+        if (showCoordinateSystem && coordinateSystem.isNotBlank()) {
+            addWrappedField("坐标系", coordinateSystem)
+        }
+        // 4. 地址 (超过11个字符换行)
+        addWrappedField("地址", address, 11)
+        // 5. 时间 (标准时间单行展示，若超长亦换行)
+        if (effectiveTime.length <= 25) {
+            result.add("时间: $effectiveTime")
+        } else {
+            addWrappedField("时间", effectiveTime, 11)
+        }
+        // 6. 海拔
+        if (showAltitude && altitude.isNotBlank()) {
+            addWrappedField("海拔", altitude)
+        }
+        // 7. 天气 (超过11个字符换行)
+        if (showWeather && weather.isNotBlank()) {
+            addWrappedField("天气", weather, 11)
+        }
+        // 8. 备注 (超过11个字符换行)
+        if (showRemarks && remarks.isNotBlank()) {
+            addWrappedField("备注", remarks, 11)
+        }
+
+        return result
     }
 
     companion object {

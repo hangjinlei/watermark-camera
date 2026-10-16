@@ -51,12 +51,12 @@ object WatermarkRenderer {
         val baseDimension = min(width, height).toFloat()
         val scale = config.fontSizeScale
 
-        // Text Paint
+        // Text Paint with System Default Font
         val textSize = baseDimension * 0.025f * scale
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             this.textSize = textSize
-            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             // Black shadow for contrast against any background
             setShadowLayer(textSize * 0.2f, textSize * 0.08f, textSize * 0.08f, Color.argb(220, 0, 0, 0))
         }
@@ -66,37 +66,13 @@ object WatermarkRenderer {
         val lineSpacing = textSize * 0.45f
         val lineHeight = textSize + lineSpacing
 
-        // Prepare watermark lines from bottom up
-        val lines = mutableListOf<String>()
-
-        if (config.showRemarks && config.remarks.isNotBlank()) {
-            lines.add("备注: ${config.remarks}")
-        }
-        if (config.showWeather && config.weather.isNotBlank()) {
-            lines.add("天气: ${config.weather}")
-        }
-        if (config.showAltitude && config.altitude.isNotBlank()) {
-            lines.add("海拔: ${config.altitude}")
-        }
-        lines.add("时间: ${config.getEffectiveTime()}")
-
-        // Multi-line wrap for address
-        val maxAddressWidth = width - paddingLeft * 2 - (baseDimension * 0.05f)
-        val addressFull = "地址: ${config.address}"
-        val wrappedAddressLines = wrapText(addressFull, textPaint, maxAddressWidth)
-        for (i in wrappedAddressLines.indices.reversed()) {
-            lines.add(wrappedAddressLines[i])
-        }
-
-        if (config.showCoordinateSystem && config.coordinateSystem.isNotBlank()) {
-            lines.add("坐标系: ${config.coordinateSystem}")
-        }
-        lines.add("纬度: ${config.latitude}")
-        lines.add("经度: ${config.longitude}")
+        // Watermark lines wrapped at 11 characters
+        val lines = config.generateWatermarkLines(config.getEffectiveTime())
+        val reversedLines = lines.reversed()
 
         // Draw lines from bottom to top
         var currentY = height - paddingBottom
-        for (line in lines) {
+        for (line in reversedLines) {
             canvas.drawText(line, paddingLeft, currentY, textPaint)
             currentY -= lineHeight
         }
@@ -108,7 +84,7 @@ object WatermarkRenderer {
             val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.WHITE
                 this.textSize = badgeTextSize
-                typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             }
             val bounds = Rect()
             badgePaint.getTextBounds(badgeText, 0, badgeText.length, bounds)
@@ -139,33 +115,36 @@ object WatermarkRenderer {
             )
         }
 
-        // Draw Center Watermark if enabled (e.g. "现场拍照")
+        // Draw Center Watermark if enabled (e.g. "现场拍照" with realistic security tilt)
         if (config.showCenterWatermark && config.centerWatermarkText.isNotBlank()) {
             val centerText = config.centerWatermarkText
-            val centerTextSize = baseDimension * 0.08f
+            val centerTextSize = baseDimension * 0.075f
             val centerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(45, 255, 255, 255)
+                color = Color.argb(50, 255, 255, 255)
                 this.textSize = centerTextSize
-                typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-                style = Paint.Style.FILL_AND_STROKE
-                strokeWidth = baseDimension * 0.003f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                letterSpacing = 0.18f
+                setShadowLayer(centerTextSize * 0.12f, 2f, 2f, Color.argb(60, 0, 0, 0))
             }
             val cBounds = Rect()
             centerPaint.getTextBounds(centerText, 0, centerText.length, cBounds)
+            canvas.save()
+            canvas.rotate(-15f, width / 2f, height / 2f)
             val cx = (width - cBounds.width()) / 2f
-            val cy = (height + cBounds.height()) / 2f - (baseDimension * 0.05f)
+            val cy = (height + cBounds.height()) / 2f
             canvas.drawText(centerText, cx, cy, centerPaint)
+            canvas.restore()
         }
 
         // Draw Bottom Right Brand Watermark if enabled (e.g. "经纬水印相机")
         if (config.showBrandWatermark && config.brandWatermarkText.isNotBlank()) {
             val brandText = config.brandWatermarkText
-            val brandTextSize = baseDimension * 0.022f * scale
+            val brandTextSize = baseDimension * 0.019f
             val brandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(120, 255, 255, 255)
+                color = Color.argb(170, 255, 255, 255)
                 this.textSize = brandTextSize
-                typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-                setShadowLayer(brandTextSize * 0.2f, 1f, 1f, Color.argb(150, 0, 0, 0))
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                setShadowLayer(brandTextSize * 0.15f, 1.5f, 1.5f, Color.argb(150, 0, 0, 0))
             }
             val bBounds = Rect()
             brandPaint.getTextBounds(brandText, 0, brandText.length, bBounds)
@@ -175,22 +154,6 @@ object WatermarkRenderer {
         }
 
         return output
-    }
-
-    private fun wrapText(text: String, paint: Paint, maxWidth: Float): List<String> {
-        val result = mutableListOf<String>()
-        var start = 0
-        while (start < text.length) {
-            val count = paint.breakText(text, start, text.length, true, maxWidth, null)
-            if (count > 0) {
-                result.add(text.substring(start, start + count))
-                start += count
-            } else {
-                result.add(text.substring(start))
-                break
-            }
-        }
-        return result
     }
 
     /**

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Button
@@ -35,11 +36,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,9 +60,12 @@ import com.example.data.WatermarkConfig
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
- * Full editor dialog for customizing all watermark parameters.
+ * Full editor dialog for customizing all watermark parameters,
+ * including coordinates, address, locked/live time, weather, remarks, and font size scaling.
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -73,9 +80,11 @@ fun EditWatermarkDialog(
     var coordinateSystem by remember { mutableStateOf(currentConfig.coordinateSystem) }
     var address by remember { mutableStateOf(currentConfig.address) }
     var time by remember { mutableStateOf(currentConfig.time.ifBlank { currentConfig.getEffectiveTime() }) }
+    var autoTime by remember { mutableStateOf(currentConfig.autoTime) }
     var altitude by remember { mutableStateOf(currentConfig.altitude) }
     var weather by remember { mutableStateOf(currentConfig.weather) }
     var remarks by remember { mutableStateOf(currentConfig.remarks) }
+    var fontSizeScale by remember { mutableFloatStateOf(currentConfig.fontSizeScale) }
     var saveAsDefault by remember { mutableStateOf(false) }
 
     val weatherPresets = listOf(
@@ -112,6 +121,7 @@ fun EditWatermarkDialog(
         ) {
             Column(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .padding(20.dp)
                     .verticalScroll(rememberScrollState())
             ) {
@@ -130,7 +140,7 @@ fun EditWatermarkDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "自定义水印内容",
+                            text = "编辑现场水印",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -142,65 +152,63 @@ fun EditWatermarkDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // GPS & Location Quick Action
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // GPS / Coordinates
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text(
-                        text = "经纬度与坐标",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    OutlinedButton(
-                        onClick = onFetchCurrentGps,
-                        modifier = Modifier.testTag("refresh_gps_button")
-                    ) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("获取实时GPS", fontSize = 12.sp)
-                    }
-                }
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "经纬度与坐标系",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            TextButton(onClick = onFetchCurrentGps) {
+                                Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("获取当前GPS", fontSize = 12.sp)
+                            }
+                        }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = longitude,
+                                onValueChange = { longitude = it },
+                                label = { Text("经度") },
+                                modifier = Modifier.weight(1f).testTag("input_longitude"),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = latitude,
+                                onValueChange = { latitude = it },
+                                label = { Text("纬度") },
+                                modifier = Modifier.weight(1f).testTag("input_latitude"),
+                                singleLine = true
+                            )
+                        }
 
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = longitude,
-                        onValueChange = { longitude = it },
-                        label = { Text("经度") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("input_longitude"),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    OutlinedTextField(
-                        value = latitude,
-                        onValueChange = { latitude = it },
-                        label = { Text("纬度") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("input_latitude"),
-                        singleLine = true
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Coordinate system selection chips
-                Text(text = "坐标系选择", style = MaterialTheme.typography.bodySmall)
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    coordPresets.forEach { sys ->
-                        FilterChip(
-                            selected = coordinateSystem == sys,
-                            onClick = { coordinateSystem = sys },
-                            label = { Text(sys, fontSize = 12.sp) }
-                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = "坐标系选择", style = MaterialTheme.typography.bodySmall)
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            coordPresets.forEach { sys ->
+                                FilterChip(
+                                    selected = coordinateSystem == sys,
+                                    onClick = { coordinateSystem = sys },
+                                    label = { Text(sys, fontSize = 12.sp) }
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -210,7 +218,7 @@ fun EditWatermarkDialog(
                 OutlinedTextField(
                     value = address,
                     onValueChange = { address = it },
-                    label = { Text("地址 (支持多行自动换行)") },
+                    label = { Text("详细地址 (超过11字自动换行)") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("input_address"),
@@ -220,30 +228,67 @@ fun EditWatermarkDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Time field
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                // Time field & Auto-time switch
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    OutlinedTextField(
-                        value = time,
-                        onValueChange = { time = it },
-                        label = { Text("时间 (yyyy-MM-dd HH:mm:ss)") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("input_time"),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    OutlinedButton(
-                        onClick = {
-                            val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                            time = sdf.format(Date())
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = time,
+                                onValueChange = {
+                                    time = it
+                                    autoTime = false // Typing or modifying time locks it!
+                                },
+                                label = { Text("时间 (yyyy-MM-dd HH:mm:ss)") },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("input_time"),
+                                singleLine = true
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                                    time = sdf.format(Date())
+                                    autoTime = false
+                                }
+                            ) {
+                                Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("设为当前", fontSize = 12.sp)
+                            }
                         }
-                    ) {
-                        Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("当前时间", fontSize = 12.sp)
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (autoTime) "动态走动模式 (每秒实时更新)" else "已锁定模式 (使用上方指定时间)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (autoTime) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = if (autoTime) "拍照将自动记录当前的真实时间" else "拍照将准确保留您所修改的固定时间",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = autoTime,
+                                onCheckedChange = { autoTime = it }
+                            )
+                        }
                     }
                 }
 
@@ -253,7 +298,7 @@ fun EditWatermarkDialog(
                 OutlinedTextField(
                     value = altitude,
                     onValueChange = { altitude = it },
-                    label = { Text("海拔") },
+                    label = { Text("海拔高度 (如 0.0米)") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("input_altitude"),
@@ -266,7 +311,7 @@ fun EditWatermarkDialog(
                 OutlinedTextField(
                     value = weather,
                     onValueChange = { weather = it },
-                    label = { Text("天气状况") },
+                    label = { Text("天气情况 (图标 + 温度 + 风向)") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("input_weather"),
@@ -292,7 +337,7 @@ fun EditWatermarkDialog(
                 OutlinedTextField(
                     value = remarks,
                     onValueChange = { remarks = it },
-                    label = { Text("备注信息") },
+                    label = { Text("备注信息 (超过11字自动换行)") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("input_remarks"),
@@ -312,7 +357,52 @@ fun EditWatermarkDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Left Watermark Font Size Scale
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.FormatSize, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "左下角水印字体大小: ${(fontSizeScale * 100).roundToInt()}%",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        Slider(
+                            value = fontSizeScale,
+                            onValueChange = { fontSizeScale = it },
+                            valueRange = 0.75f..1.35f,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(
+                                "较小 (85%)" to 0.85f,
+                                "标准 (100%)" to 1.0f,
+                                "较大 (115%)" to 1.15f,
+                                "特大 (130%)" to 1.30f
+                            ).forEach { (label, scaleVal) ->
+                                FilterChip(
+                                    selected = abs(fontSizeScale - scaleVal) < 0.04f,
+                                    onClick = { fontSizeScale = scaleVal },
+                                    label = { Text(label, fontSize = 11.sp) }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // "Save as default" checkbox
                 Row(
@@ -363,9 +453,11 @@ fun EditWatermarkDialog(
                                 coordinateSystem = coordinateSystem,
                                 address = address,
                                 time = time,
+                                autoTime = autoTime,
                                 altitude = altitude,
                                 weather = weather,
-                                remarks = remarks
+                                remarks = remarks,
+                                fontSizeScale = fontSizeScale
                             )
                             onConfirm(updatedConfig, saveAsDefault)
                         },

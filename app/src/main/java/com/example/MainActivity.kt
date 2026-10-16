@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.example.data.SettingsManager
 import com.example.ui.screens.CameraScreen
@@ -50,6 +51,7 @@ class MainActivity : ComponentActivity() {
 fun WatermarkApp(settingsManager: SettingsManager) {
     val backStack = remember { mutableStateListOf<Screen>(Screen.Camera) }
     val currentScreen = backStack.lastOrNull() ?: Screen.Camera
+    var activeConfig by remember { androidx.compose.runtime.mutableStateOf(settingsManager.getDefaultConfig()) }
 
     BackHandler(enabled = backStack.size > 1) {
         if (backStack.size > 1) {
@@ -60,6 +62,8 @@ fun WatermarkApp(settingsManager: SettingsManager) {
     when (val screen = currentScreen) {
         is Screen.Camera -> {
             CameraScreen(
+                config = activeConfig,
+                onConfigChange = { activeConfig = it },
                 settingsManager = settingsManager,
                 onNavigateToSettings = {
                     backStack.add(Screen.Settings)
@@ -78,6 +82,9 @@ fun WatermarkApp(settingsManager: SettingsManager) {
                 settingsManager = settingsManager,
                 onBack = {
                     if (backStack.size > 1) backStack.removeAt(backStack.size - 1)
+                },
+                onSaveDefault = { newDefault ->
+                    activeConfig = newDefault
                 }
             )
         }

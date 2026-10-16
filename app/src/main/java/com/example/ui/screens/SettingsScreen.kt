@@ -67,7 +67,8 @@ import com.example.data.WatermarkConfig
 @Composable
 fun SettingsScreen(
     settingsManager: SettingsManager,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSaveDefault: ((WatermarkConfig) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var currentDefault by remember { mutableStateOf(settingsManager.getDefaultConfig()) }
@@ -76,6 +77,7 @@ fun SettingsScreen(
     var latitude by remember { mutableStateOf(currentDefault.latitude) }
     var coordinateSystem by remember { mutableStateOf(currentDefault.coordinateSystem) }
     var address by remember { mutableStateOf(currentDefault.address) }
+    var time by remember { mutableStateOf(currentDefault.time) }
     var altitude by remember { mutableStateOf(currentDefault.altitude) }
     var weather by remember { mutableStateOf(currentDefault.weather) }
     var remarks by remember { mutableStateOf(currentDefault.remarks) }
@@ -123,6 +125,7 @@ fun SettingsScreen(
                             latitude = reset.latitude
                             coordinateSystem = reset.coordinateSystem
                             address = reset.address
+                            time = reset.time
                             altitude = reset.altitude
                             weather = reset.weather
                             remarks = reset.remarks
@@ -176,7 +179,7 @@ fun SettingsScreen(
                                 latitude = latitude,
                                 coordinateSystem = coordinateSystem,
                                 address = address,
-                                time = "",
+                                time = time,
                                 altitude = altitude,
                                 weather = weather,
                                 remarks = remarks,
@@ -195,6 +198,7 @@ fun SettingsScreen(
                                 fontSizeScale = fontSizeScale
                             )
                             settingsManager.saveDefaultConfig(newConfig)
+                            onSaveDefault?.invoke(newConfig)
                             Toast.makeText(context, "默认值已成功保存！下次启动自动生效", Toast.LENGTH_SHORT).show()
                             onBack()
                         },
@@ -292,6 +296,35 @@ fun SettingsScreen(
                         minLines = 2,
                         maxLines = 4
                     )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // 时间
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = time,
+                            onValueChange = {
+                                time = it
+                                autoTime = false
+                            },
+                            label = { Text("默认固定时间 (yyyy-MM-dd HH:mm:ss)") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+                                time = sdf.format(java.util.Date())
+                                autoTime = false
+                            }
+                        ) {
+                            Text("填入当前", fontSize = 12.sp)
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
